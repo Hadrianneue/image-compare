@@ -193,21 +193,52 @@
             const urls = document.querySelectorAll('.url-input');
             const names = document.querySelectorAll('.name-input');
             let parts = [];
-
+        
             for (let i = 0; i < urls.length; i++) {
                 let url = urls[i].value.trim();
                 let name = names[i].value.trim() || `Image ${i + 1}`;
                 
                 if (url) {
-                    let match = url.match(/imgur\.com\/([a-zA-Z0-9]+\.[a-zA-Z0-9]+)/);
+                    // Smarter Regex: Grabs the ID whether it's imgur.com/ID, i.imgur.com/ID.ext, or imgur.com/gallery/ID
+                    let match = url.match(/imgur\.com\/(?:gallery\/|a\/)?([a-zA-Z0-9]+)/);
+                    
                     if (match && match[1]) {
-                        parts.push(`${match[1]}~${name}`);
+                        let id = match[1];
+                        
+                        // Check if the user pasted a direct link that already has an extension
+                        let extMatch = url.match(/\.([a-zA-Z0-9]+)$/);
+                        
+                        // If no extension is found, default to .jpeg 
+                        let extension = extMatch ? `.${extMatch[1]}` : '.jpeg';
+                        
+                        // Push the perfectly formatted i.imgur.com data to our array
+                        parts.push(`${id}${extension}~${name}`);
                     } else {
-                        alert(`Error in row ${i + 1}: Make sure it is a direct Imgur link.`);
+                        alert(`Error in row ${i + 1}: Make sure it is a valid Imgur link.`);
                         return; 
-                    }
-                }
+                   }
             }
+        }
+
+    if (parts.length === 0) {
+        alert("Please enter at least one valid Imgur URL.");
+        return;
+    }
+
+    const rawString = parts.join('|');
+    const encodedHash = btoa(rawString);
+    
+    // Update the URL (this triggers the 'hashchange' event to reload the viewer)
+    window.location.hash = encodedHash;
+    
+    // Hide the modal
+    closeModal();
+    
+    // Reset the slider to the middle
+    document.getElementById('slider').value = 50;
+    document.getElementById('slider-line').style.left = `50%`;
+    document.getElementById('img-overlay').style.clipPath = `polygon(0 0, 50% 0, 50% 100%, 0 100%)`;
+}
 
             if (parts.length === 0) {
                 alert("Please enter at least one valid Imgur URL.");
