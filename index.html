@@ -3,47 +3,65 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Image Comparison</title>
+    <title>Image Comparison Pro</title>
     <style>
-        body { font-family: sans-serif; background: #121212; color: white; display: flex; flex-direction: column; align-items: center; padding: 0; margin: 0; min-height: 100vh; }
+        /* Base Layout */
+        body { font-family: sans-serif; background: #121212; color: white; display: flex; flex-direction: column; align-items: center; padding: 0; margin: 0; height: 100vh; overflow: hidden; }
 
         /* Top Navigation Bar */
-        .top-bar { width: 100%; padding: 15px 0; background: #1e1e1e; display: flex; justify-content: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3); margin-bottom: 20px; }
-        .btn-new { background: #007bff; color: white; border: none; padding: 12px 24px; font-size: 18px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: 0.2s; }
+        .top-bar { width: 100%; padding: 10px 0; background: #1e1e1e; display: flex; justify-content: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3); z-index: 20; flex-shrink: 0; }
+        .btn-new { background: #007bff; color: white; border: none; padding: 10px 20px; font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: 0.2s; }
         .btn-new:hover { background: #0056b3; transform: scale(1.05); }
 
         /* Viewer Controls */
-        .controls { display: none; gap: 20px; margin-bottom: 20px; width: 100%; max-width: 800px; justify-content: space-between; }
-        select { padding: 8px; font-size: 16px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; width: 45%; }
+        .controls { display: none; gap: 15px; padding: 10px; width: 100%; box-sizing: border-box; background: #222; align-items: center; justify-content: center; flex-shrink: 0; z-index: 20; border-bottom: 1px solid #333; flex-wrap: wrap; }
+        select { padding: 8px; font-size: 14px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; max-width: 200px; }
 
-        /* Slider Container */
-        .comparison-container {
-            position: relative;
-            width: 100%;
-            max-width: 800px;
-            aspect-ratio: 16/9;
-            background: #000; /* Empty black canvas */
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 8px 16px rgba(0,0,0,0.5);
+        /* Zoom & Pan Controls */
+        .zoom-controls { display: flex; align-items: center; gap: 10px; border-left: 1px solid #555; padding-left: 15px; margin-left: 5px; }
+        .btn-zoom { background: #444; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .btn-zoom:hover { background: #555; }
+        .btn-zoom.active { background: #ff9800; color: black; }
+        #zoom-slider { display: none; width: 100px; cursor: pointer; }
+
+        /* Pan Toggle Styles */
+        .pan-ui { display: none; align-items: center; gap: 8px; background: #1a1a1a; padding: 5px 10px; border-radius: 6px; border: 1px solid #444; }
+        .btn-pan { background: #28a745; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 13px; width: 85px; text-align: center; }
+        .btn-pan.locked { background: #dc3545; }
+        .hotkey-label { font-size: 12px; color: #aaa; }
+        #pan-hotkey { background: #333; color: #ffeb3b; border: 1px solid #666; width: 22px; text-align: center; border-radius: 3px; font-weight: bold; padding: 3px; font-size: 13px; }
+        #pan-hotkey:focus { outline: none; border-color: #ffeb3b; }
+
+        /* Canvas & Layers */
+        .comparison-container { position: relative; width: 100%; flex-grow: 1; background: #000; overflow: hidden; }
+
+        /* Loading Spinner */
+        #loading-spinner {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 60px; height: 60px; border: 6px solid rgba(255, 255, 255, 0.1);
+            border-top: 6px solid #007bff; border-radius: 50%; animation: spin 1s linear infinite;
+            z-index: 50; display: none; box-shadow: 0 0 15px rgba(0,0,0,0.5);
         }
+        @keyframes spin { 0% { transform: translate(-50%, -50%) rotate(0deg); } 100% { transform: translate(-50%, -50%) rotate(360deg); } }
 
-        .comparison-container img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; display: none; }
-        #img-overlay { clip-path: polygon(0 0, 50% 0, 50% 100%, 0 100%); }
+        .image-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        #layer-overlay { clip-path: polygon(0 0, 50% 0, 50% 100%, 0 100%); }
 
-        #slider { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: ew-resize; z-index: 10; display: none; }
+        .zoom-wrapper { width: 100%; height: 100%; transition: transform 0.1s ease-out; transform-origin: center center; }
+        .zoom-wrapper img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; }
+
+        /* Slider Elements */
         #slider-line { position: absolute; top: 0; left: 50%; width: 4px; height: 100%; background: white; z-index: 5; pointer-events: none; box-shadow: 0 0 10px rgba(0,0,0,0.8); display: none; }
 
-        /* Modal / Overlay Styles */
-        #generator-modal {
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.85); z-index: 100; justify-content: center; align-items: center;
-        }
-        .modal-content { background: #1e1e1e; padding: 30px; border-radius: 12px; width: 100%; max-width: 600px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
-        .modal-content h2 { margin-top: 0; border-bottom: 1px solid #444; padding-bottom: 10px; }
+        /* Default Cursor is ew-resize */
+        #slider { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: ew-resize; z-index: 10; display: none; }
 
+        /* Modal Overlay */
+        #generator-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.85); z-index: 100; justify-content: center; align-items: center; }
+        .modal-content { background: #1e1e1e; padding: 30px; border-radius: 12px; width: 90%; max-width: 600px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
+        .modal-content h2 { margin-top: 0; border-bottom: 1px solid #444; padding-bottom: 10px; }
         .row { display: flex; gap: 10px; margin-bottom: 15px; }
         .row input { flex: 1; padding: 10px; border: 1px solid #555; background: #333; color: white; border-radius: 4px; }
-
         .modal-actions { display: flex; justify-content: space-between; margin-top: 20px; }
         .btn-add { background: #444; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; }
         .btn-add:hover { background: #555; }
@@ -62,11 +80,27 @@
     <div class="controls" id="controls">
         <select id="left-select"></select>
         <select id="right-select"></select>
+
+        <div class="zoom-controls">
+            <button id="btn-zoom" class="btn-zoom" onclick="toggleZoom()">🔍 Zoom: OFF</button>
+            <input type="range" id="zoom-slider" min="1" max="5" step="0.1" value="1">
+
+            <div class="pan-ui" id="pan-ui">
+                <button id="btn-pan" class="btn-pan" onclick="togglePan()">✥ Pan: ON</button>
+                <span class="hotkey-label">Key:</span>
+                <input type="text" id="pan-hotkey" value="Z" maxlength="1" title="Hotkey to lock panning">
+            </div>
+        </div>
     </div>
 
     <div class="comparison-container" id="canvas">
-        <img id="img-base" src="" alt="Right Image">
-        <img id="img-overlay" src="" alt="Left Image">
+        <div id="loading-spinner"></div>
+        <div class="image-layer" id="layer-base">
+            <div class="zoom-wrapper"><img id="img-base" src="" alt="Right Image"></div>
+        </div>
+        <div class="image-layer" id="layer-overlay">
+            <div class="zoom-wrapper"><img id="img-overlay" src="" alt="Left Image"></div>
+        </div>
         <div id="slider-line"></div>
         <input type="range" id="slider" min="0" max="100" value="50">
     </div>
@@ -76,17 +110,15 @@
             <h2>Create New Comparison</h2>
             <div id="input-container">
                 <div class="row">
-                    <input type="text" class="url-input" placeholder="Imgur URL (e.g. https://i.imgur.com/BSGGbZt.png)">
-                    <input type="text" class="name-input" placeholder="Name (e.g. Before)">
+                    <input type="text" class="url-input" placeholder="Any direct image URL (e.g. Catbox, ImgBB)">
+                    <input type="text" class="name-input" placeholder="Name">
                 </div>
                 <div class="row">
-                    <input type="text" class="url-input" placeholder="Imgur URL (e.g. https://i.imgur.com/5G43T3G.png)">
-                    <input type="text" class="name-input" placeholder="Name (e.g. After)">
+                    <input type="text" class="url-input" placeholder="Any direct image URL">
+                    <input type="text" class="name-input" placeholder="Name">
                 </div>
             </div>
-
             <button class="btn-add" onclick="addRow()">+ Add Image</button>
-
             <div class="modal-actions">
                 <button class="btn-close" onclick="closeModal()">Cancel</button>
                 <button class="btn-generate" onclick="generateHash()">Generate & View</button>
@@ -95,97 +127,207 @@
     </div>
 
     <script>
-        const IMGUR_BASE = "https://i.imgur.com/";
         let imageCache = {};
+        let isZoomActive = false;
+        let currentZoomLevel = 1;
+        let isPanningActive = true;
+
+        const zoomWrappers = document.querySelectorAll('.zoom-wrapper');
+        const layerOverlay = document.getElementById('layer-overlay');
+        const zoomBtn = document.getElementById('btn-zoom');
+        const zoomSlider = document.getElementById('zoom-slider');
+        const panUI = document.getElementById('pan-ui');
+        const panBtn = document.getElementById('btn-pan');
+        const panHotkeyInput = document.getElementById('pan-hotkey');
+        const comparisonSlider = document.getElementById('slider');
+        const loadingSpinner = document.getElementById('loading-spinner');
+
+        // --- NEW: Cursor Update Logic ---
+        function updateCursor() {
+            if (isZoomActive && isPanningActive && currentZoomLevel > 1) {
+                comparisonSlider.style.cursor = 'grab'; // Open hand
+            } else {
+                comparisonSlider.style.cursor = 'ew-resize'; // Left-right arrows
+            }
+        }
 
         // --- Viewer Logic ---
         function initViewer() {
             const hash = window.location.hash.substring(1);
             const controls = document.getElementById('controls');
-            const sliderControls = [document.getElementById('img-base'), document.getElementById('img-overlay'), document.getElementById('slider-line'), document.getElementById('slider')];
+            const visualElements = [document.getElementById('layer-base'), document.getElementById('layer-overlay'), document.getElementById('slider-line'), comparisonSlider];
             const leftSelect = document.getElementById('left-select');
             const rightSelect = document.getElementById('right-select');
 
-            // Reset UI
             leftSelect.innerHTML = '';
             rightSelect.innerHTML = '';
             imageCache = {};
+            resetZoom();
 
             if (!hash) {
-                // Empty state: Hide controls, keep black canvas
                 controls.style.display = 'none';
-                sliderControls.forEach(el => el.style.display = 'none');
+                visualElements.forEach(el => el.style.display = 'none');
                 return;
             }
 
             try {
-                const decodedString = atob(hash);
+                const decodedString = decodeURIComponent(atob(hash));
                 const imageStrings = decodedString.split('|');
                 let parsedImages = [];
 
                 imageStrings.forEach((str, index) => {
-                    const [id, name] = str.split('~');
-                    const fullUrl = IMGUR_BASE + id;
-                    parsedImages.push({ id, name, fullUrl });
+                    const [fullUrl, name] = str.split('~');
+                    if(fullUrl) {
+                        parsedImages.push({ name, fullUrl });
+                        leftSelect.add(new Option(name || `Image ${index + 1}`, fullUrl));
+                        rightSelect.add(new Option(name || `Image ${index + 1}`, fullUrl));
 
-                    leftSelect.add(new Option(name || `Image ${index + 1}`, fullUrl));
-                    rightSelect.add(new Option(name || `Image ${index + 1}`, fullUrl));
-
-                    const img = new Image();
-                    img.src = fullUrl;
-                    imageCache[fullUrl] = img;
+                        const img = new Image();
+                        img.src = fullUrl;
+                        imageCache[fullUrl] = img;
+                    }
                 });
 
                 if (parsedImages.length > 0) {
                     leftSelect.selectedIndex = 0;
                     rightSelect.selectedIndex = parsedImages.length > 1 ? 1 : 0;
 
-                    // Show controls and images
                     controls.style.display = 'flex';
-                    sliderControls.forEach(el => el.style.display = 'block');
+                    visualElements.forEach(el => el.style.display = 'block');
                     updateImages();
                 }
             } catch (e) {
-                alert("Failed to parse image hash. It might be broken.");
-                console.error(e);
+                console.error("Decoding error:", e);
+                alert("Failed to parse image hash. The link might be broken.");
             }
         }
 
         function updateImages() {
-            document.getElementById('img-overlay').src = document.getElementById('left-select').value;
-            document.getElementById('img-base').src = document.getElementById('right-select').value;
+            loadingSpinner.style.display = 'block';
+            let loadedCount = 0;
+
+            const imgOverlay = document.getElementById('img-overlay');
+            const imgBase = document.getElementById('img-base');
+
+            const checkLoadStatus = () => {
+                loadedCount++;
+                if (loadedCount >= 2) {
+                    loadingSpinner.style.display = 'none';
+                }
+            };
+
+            imgOverlay.onload = checkLoadStatus;
+            imgOverlay.onerror = checkLoadStatus;
+            imgBase.onload = checkLoadStatus;
+            imgBase.onerror = checkLoadStatus;
+
+            imgOverlay.src = document.getElementById('left-select').value;
+            imgBase.src = document.getElementById('right-select').value;
         }
 
         document.getElementById('left-select').addEventListener('change', updateImages);
         document.getElementById('right-select').addEventListener('change', updateImages);
 
-        document.getElementById('slider').addEventListener('input', (e) => {
+        comparisonSlider.addEventListener('input', (e) => {
             const percentage = e.target.value;
             document.getElementById('slider-line').style.left = `${percentage}%`;
-            document.getElementById('img-overlay').style.clipPath = `polygon(0 0, ${percentage}% 0, ${percentage}% 100%, 0 100%)`;
+            layerOverlay.style.clipPath = `polygon(0 0, ${percentage}% 0, ${percentage}% 100%, 0 100%)`;
         });
 
-        // Listen for URL changes so the page updates instantly without a refresh
+        // --- NEW: Dynamic Grabbing Logic ---
+        comparisonSlider.addEventListener('mousedown', () => {
+            if (comparisonSlider.style.cursor === 'grab') {
+                comparisonSlider.style.cursor = 'grabbing'; // Closed hand when clicking
+            }
+        });
+        comparisonSlider.addEventListener('mouseup', () => {
+            updateCursor(); // Revert back to grab or ew-resize when releasing
+        });
+
+        // --- Zoom & Pan Logic ---
+        function toggleZoom() {
+            isZoomActive = !isZoomActive;
+            if (isZoomActive) {
+                zoomBtn.innerText = "🔍 Zoom: ON";
+                zoomBtn.classList.add('active');
+                zoomSlider.style.display = 'inline-block';
+                panUI.style.display = 'flex';
+                currentZoomLevel = zoomSlider.value;
+                zoomWrappers.forEach(w => w.style.transform = `scale(${currentZoomLevel})`);
+            } else {
+                resetZoom();
+            }
+            updateCursor();
+        }
+
+        function resetZoom() {
+            isZoomActive = false;
+            zoomBtn.innerText = "🔍 Zoom: OFF";
+            zoomBtn.classList.remove('active');
+            zoomSlider.style.display = 'none';
+            panUI.style.display = 'none';
+            zoomSlider.value = 1;
+
+            zoomWrappers.forEach(w => {
+                w.style.transform = `scale(1)`;
+                w.style.transformOrigin = `center center`;
+            });
+
+            isPanningActive = true;
+            panBtn.innerText = "✥ Pan: ON";
+            panBtn.classList.remove('locked');
+            updateCursor();
+        }
+
+        function togglePan() {
+            if(!isZoomActive) return;
+            isPanningActive = !isPanningActive;
+            if (isPanningActive) {
+                panBtn.innerText = "✥ Pan: ON";
+                panBtn.classList.remove('locked');
+            } else {
+                panBtn.innerText = "🔒 Locked";
+                panBtn.classList.add('locked');
+            }
+            updateCursor();
+        }
+
+        zoomSlider.addEventListener('input', (e) => {
+            currentZoomLevel = e.target.value;
+            zoomWrappers.forEach(w => w.style.transform = `scale(${currentZoomLevel})`);
+            updateCursor();
+        });
+
+        comparisonSlider.addEventListener('mousemove', (e) => {
+            if (isZoomActive && currentZoomLevel > 1 && isPanningActive) {
+                const rect = e.target.getBoundingClientRect();
+                const x = ((e.clientX - rect.left) / rect.width) * 100;
+                const y = ((e.clientY - rect.top) / rect.height) * 100;
+                zoomWrappers.forEach(w => w.style.transformOrigin = `${x}% ${y}%`);
+            }
+        });
+
+        panHotkeyInput.addEventListener('input', (e) => { e.target.value = e.target.value.toUpperCase(); });
+
+        window.addEventListener('keydown', (e) => {
+            if (document.getElementById('generator-modal').style.display === 'flex') return;
+            if (document.activeElement === panHotkeyInput) return;
+            if (e.key.toUpperCase() === panHotkeyInput.value.toUpperCase() && isZoomActive) {
+                togglePan();
+            }
+        });
+
         window.addEventListener('hashchange', initViewer);
 
-
         // --- Generator Modal Logic ---
-        function openModal() {
-            document.getElementById('generator-modal').style.display = 'flex';
-        }
-
-        function closeModal() {
-            document.getElementById('generator-modal').style.display = 'none';
-        }
+        function openModal() { document.getElementById('generator-modal').style.display = 'flex'; }
+        function closeModal() { document.getElementById('generator-modal').style.display = 'none'; }
 
         function addRow() {
             const container = document.getElementById('input-container');
             const row = document.createElement('div');
             row.className = 'row';
-            row.innerHTML = `
-                <input type="text" class="url-input" placeholder="Imgur URL">
-                <input type="text" class="name-input" placeholder="Name">
-            `;
+            row.innerHTML = `<input type="text" class="url-input" placeholder="Any direct image URL"><input type="text" class="name-input" placeholder="Name">`;
             container.appendChild(row);
         }
 
@@ -199,48 +341,36 @@
                 let name = names[i].value.trim() || `Image ${i + 1}`;
 
                 if (url) {
-                    // Smarter Regex: Grabs the ID whether it's imgur.com/ID, i.imgur.com/ID.ext, or imgur.com/gallery/ID
-                    let match = url.match(/imgur\.com\/(?:gallery\/|a\/)?([a-zA-Z0-9]+)/);
-
-                    if (match && match[1]) {
-                        let id = match[1];
-
-                        // Check if the user pasted a direct link that already has an extension
-                        let extMatch = url.match(/\.([a-zA-Z0-9]+)$/);
-
-                        // If no extension is found, default to .jpeg
-                        let extension = extMatch ? `.${extMatch[1]}` : '.jpeg';
-
-                        // Push the perfectly formatted i.imgur.com data to our array
-                        parts.push(`${id}${extension}~${name}`);
+                    if (url.startsWith('http')) {
+                        parts.push(`${url}~${name}`);
                     } else {
-                        alert(`Error in row ${i + 1}: Make sure it is a valid Imgur link.`);
+                        alert(`Error in row ${i + 1}: Make sure it is a full, valid web link starting with http/https.`);
                         return;
                     }
                 }
             }
 
             if (parts.length === 0) {
-                alert("Please enter at least one valid Imgur URL.");
+                alert("Please enter at least one valid image URL.");
                 return;
             }
 
-            const rawString = parts.join('|');
-            const encodedHash = btoa(rawString);
+            try {
+                const rawString = parts.join('|');
+                const encodedHash = btoa(encodeURIComponent(rawString));
+                window.location.hash = encodedHash;
 
-            // Update the URL (this triggers the 'hashchange' event to reload the viewer)
-            window.location.hash = encodedHash;
+                closeModal();
 
-            // Hide the modal
-            closeModal();
-
-            // Reset the slider to the middle
-            document.getElementById('slider').value = 50;
-            document.getElementById('slider-line').style.left = `50%`;
-            document.getElementById('img-overlay').style.clipPath = `polygon(0 0, 50% 0, 50% 100%, 0 100%)`;
+                comparisonSlider.value = 50;
+                document.getElementById('slider-line').style.left = `50%`;
+                layerOverlay.style.clipPath = `polygon(0 0, 50% 0, 50% 100%, 0 100%)`;
+            } catch (e) {
+                console.error("Encoding error:", e);
+                alert("Failed to generate link. Make sure your inputs don't contain extremely unusual characters.");
+            }
         }
 
-        // Start the app
         initViewer();
     </script>
 </body>
